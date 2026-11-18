@@ -24,10 +24,13 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.LayoutInflater
+import android.view.Gravity
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -35,6 +38,7 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import coil3.SingletonImageLoader
 import com.google.android.material.appbar.AppBarLayout
+import com.google.android.material.appbar.CollapsingToolbarLayout
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -48,6 +52,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.akanework.gramophone.R
+import org.akanework.gramophone.custom.HiddenAdminGate
+import org.akanework.gramophone.custom.EmojiDisplay
 import org.akanework.gramophone.logic.clone
 import org.akanework.gramophone.logic.enableEdgeToEdgePaddingListener
 import org.akanework.gramophone.logic.needsManualSnackBarInset
@@ -89,127 +95,39 @@ class ViewPagerFragment : BaseFragment(true) {
         topAppBar.overflowIcon =
             AppCompatResources.getDrawable(requireContext(), R.drawable.ic_more_vert_alt_topappbar)
 
-        topAppBar.setOnMenuItemClickListener { it ->
-            val activity = requireActivity() as MainActivity
-            when (it.itemId) {
-                R.id.search -> {
-                    activity.startFragment(SearchFragment())
-                }
-
-                R.id.equalizer -> {
-                    val intent =
-                        Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
-                            // EXTRA_PACKAGE_NAME is probably not needed but might as well add for good measure
-                            putExtra(AudioEffect.EXTRA_PACKAGE_NAME, requireContext().packageName)
-                            putExtra(
-                                AudioEffect.EXTRA_AUDIO_SESSION,
-                                activity.getPlayer()?.audioSessionId
-                            )
-                            putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
-                        }
-                    try {
-                        if (Settings.System.getString(
-                                requireContext().contentResolver,
-                                "firebase.test.lab"
-                            ) != "true"
-                        ) {
-                            activity.startingActivity.launch(intent)
-                        }
-                    } catch (_: ActivityNotFoundException) {
-                        // Let's show a toast here if no system inbuilt EQ was found.
-                        Toast.makeText(
-                            requireContext(),
-                            R.string.equalizer_not_found,
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
-
-                R.id.quick_refresh -> {
-                    val imageLoader = SingletonImageLoader.get(requireContext())
-                    imageLoader.memoryCache?.clear()
-                    val playerLayout = activity.playerBottomSheet
-                    activity.updateLibrary {
-                        showRefreshDoneSnackBar(
-                            playerLayout,
-                            runBlocking { activity.reader.songListFlow.first().size })
-                    }
-                }
-
-                R.id.refresh -> {
-                    val context = requireContext()
-                    val imageLoader = SingletonImageLoader.get(context)
-                    imageLoader.memoryCache?.clear()
-                    val playerLayout = activity.playerBottomSheet
-                    MaterialAlertDialogBuilder(context)
-                        .setIcon(R.drawable.ic_refresh)
-                        .setTitle(R.string.did_you_know)
-                        .setMessage(R.string.refresh_did_you_know)
-                        .setPositiveButton(android.R.string.ok) { _, _ -> }
-                        .show()
-                    Toast.makeText(context, R.string.refreshing_wait, Toast.LENGTH_LONG).show()
-                    CoroutineScope(Dispatchers.Default).launch {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                            SdScanner.scanEverything(context, 5000) { progress ->
-                                if (progress.step != SdScanner.SimpleProgress.Step.DONE) {
-                                    val str = if (progress.percentage == null)
-                                        context.getString(R.string.refreshing_wait)
-                                    else context.getString(
-                                        R.string.still_refreshing,
-                                        progress.step.ordinal,
-                                        SdScanner.SimpleProgress.Step.DONE.ordinal - 1,
-                                        "${progress.percentage}%"
-                                    )
-                                    CoroutineScope(Dispatchers.Main).launch {
-                                        Toast.makeText(context, str, Toast.LENGTH_SHORT).show()
-                                    }
-                                    return@scanEverything
-                                }
-                                activity.updateLibrary(false) {
-                                    showRefreshDoneSnackBar(
-                                        playerLayout,
-                                        runBlocking { activity.reader.songListFlow.first().size })
-                                }
-                            }
-                        } else {
-                            val job = launch(Dispatchers.IO) {
-                                MediaStoreCompat.scanEverything(context)
-                            }
-                            while (!job.isCompleted) {
-                                delay(5000)
-                                CoroutineScope(Dispatchers.Main).launch {
-                                    Toast.makeText(context, context.getString(
-                                        R.string.refreshing_wait),
-                                        Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        }
-                    }
-                }
-
-                R.id.settings -> {
-                    activity.startActivity(Intent(activity, MainSettingsActivity::class.java))
-                }
-
-                R.id.shuffle -> {
-                    ShortcutManagerCompat.reportShortcutUsed(requireContext(), "shuffle_all")
-                    val controller = activity.getPlayer()
-                    runBlocking { activity.reader.songListFlow.first() }.takeIf { it.isNotEmpty() }
-                        ?.also {
-                            controller?.setMediaItemsWithTitle(
-                                it,
-                                title = requireContext().getString(R.string.category_songs),
-                                shuffleEnabled = true,
-                            )
-                            controller?.prepare()
-                            controller?.play()
-                        } ?: controller?.setMediaItems(listOf())
-                }
-
-                else -> throw IllegalStateException()
-            }
-            true
+        // All administrative toolbar actions live in the PIN-protected popup.
+        // Search stays visible; the three-dot overflow menu disappears.
+        topAppBar.setOnMenuItemClickListener { item -> handleHomeMenuItemClick(item) }
+        listOf(R.id.shuffle, R.id.quick_refresh, R.id.refresh,
+            R.id.equalizer, R.id.settings).forEach { id ->
+            topAppBar.menu.findItem(id)?.isVisible = false
         }
+
+        val adminGate = HiddenAdminGate(requireActivity()) {
+            PopupMenu(requireContext(), topAppBar, Gravity.END).apply {
+                inflate(R.menu.home_menu)
+                menu.findItem(R.id.search)?.isVisible = false
+                menu.add(0, EmojiDisplay.ADMIN_MENU_ID, 0, "🧸 Kleinkindmodus (Emoji)").apply {
+                    isCheckable = true
+                    isChecked = EmojiDisplay.isEnabled(requireContext())
+                }
+                setOnMenuItemClickListener { item ->
+                    if (item.itemId == EmojiDisplay.ADMIN_MENU_ID) {
+                        EmojiDisplay.setEnabled(requireContext(), !EmojiDisplay.isEnabled(requireContext()))
+                        // Recreate refreshes album lists, headings and both player UIs.
+                        requireActivity().recreate()
+                        true
+                    } else handleHomeMenuItemClick(item)
+                }
+                show()
+            }
+        }
+        // The title is drawn by CollapsingToolbarLayout, not a TextView.
+        // Both the expanded and collapsed title regions accept the five taps.
+        val collapsingTitle =
+            rootView.findViewById<CollapsingToolbarLayout>(R.id.collapsingtoolbar)
+        collapsingTitle.setOnClickListener { adminGate.onTitleTap() }
+        topAppBar.setOnClickListener { adminGate.onTitleTap() }
 
         // Connect ViewPager2.
 
@@ -267,6 +185,128 @@ class ViewPagerFragment : BaseFragment(true) {
         }
 
         return rootView
+    }
+
+    private fun handleHomeMenuItemClick(it: MenuItem): Boolean {
+        val activity = requireActivity() as MainActivity
+        when (it.itemId) {
+            R.id.search -> {
+                activity.startFragment(SearchFragment())
+            }
+
+            R.id.equalizer -> {
+                val intent =
+                    Intent(AudioEffect.ACTION_DISPLAY_AUDIO_EFFECT_CONTROL_PANEL).apply {
+                        // EXTRA_PACKAGE_NAME is probably not needed but might as well add for good measure
+                        putExtra(AudioEffect.EXTRA_PACKAGE_NAME, requireContext().packageName)
+                        putExtra(
+                            AudioEffect.EXTRA_AUDIO_SESSION,
+                            activity.getPlayer()?.audioSessionId
+                        )
+                        putExtra(AudioEffect.EXTRA_CONTENT_TYPE, AudioEffect.CONTENT_TYPE_MUSIC)
+                    }
+                try {
+                    if (Settings.System.getString(
+                            requireContext().contentResolver,
+                            "firebase.test.lab"
+                        ) != "true"
+                    ) {
+                        activity.startingActivity.launch(intent)
+                    }
+                } catch (_: ActivityNotFoundException) {
+                    // Let's show a toast here if no system inbuilt EQ was found.
+                    Toast.makeText(
+                        requireContext(),
+                        R.string.equalizer_not_found,
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+
+            R.id.quick_refresh -> {
+                val imageLoader = SingletonImageLoader.get(requireContext())
+                imageLoader.memoryCache?.clear()
+                val playerLayout = activity.playerBottomSheet
+                activity.updateLibrary {
+                    showRefreshDoneSnackBar(
+                        playerLayout,
+                        runBlocking { activity.reader.songListFlow.first().size })
+                }
+            }
+
+            R.id.refresh -> {
+                val context = requireContext()
+                val imageLoader = SingletonImageLoader.get(context)
+                imageLoader.memoryCache?.clear()
+                val playerLayout = activity.playerBottomSheet
+                MaterialAlertDialogBuilder(context)
+                    .setIcon(R.drawable.ic_refresh)
+                    .setTitle(R.string.did_you_know)
+                    .setMessage(R.string.refresh_did_you_know)
+                    .setPositiveButton(android.R.string.ok) { _, _ -> }
+                    .show()
+                Toast.makeText(context, R.string.refreshing_wait, Toast.LENGTH_LONG).show()
+                CoroutineScope(Dispatchers.Default).launch {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        SdScanner.scanEverything(context, 5000) { progress ->
+                            if (progress.step != SdScanner.SimpleProgress.Step.DONE) {
+                                val str = if (progress.percentage == null)
+                                    context.getString(R.string.refreshing_wait)
+                                else context.getString(
+                                    R.string.still_refreshing,
+                                    progress.step.ordinal,
+                                    SdScanner.SimpleProgress.Step.DONE.ordinal - 1,
+                                    "${progress.percentage}%"
+                                )
+                                CoroutineScope(Dispatchers.Main).launch {
+                                    Toast.makeText(context, str, Toast.LENGTH_SHORT).show()
+                                }
+                                return@scanEverything
+                            }
+                            activity.updateLibrary(false) {
+                                showRefreshDoneSnackBar(
+                                    playerLayout,
+                                    runBlocking { activity.reader.songListFlow.first().size })
+                            }
+                        }
+                    } else {
+                        val job = launch(Dispatchers.IO) {
+                            MediaStoreCompat.scanEverything(context)
+                        }
+                        while (!job.isCompleted) {
+                            delay(5000)
+                            CoroutineScope(Dispatchers.Main).launch {
+                                Toast.makeText(context, context.getString(
+                                    R.string.refreshing_wait),
+                                    Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                }
+            }
+
+            R.id.settings -> {
+                activity.startActivity(Intent(activity, MainSettingsActivity::class.java))
+            }
+
+            R.id.shuffle -> {
+                ShortcutManagerCompat.reportShortcutUsed(requireContext(), "shuffle_all")
+                val controller = activity.getPlayer()
+                runBlocking { activity.reader.songListFlow.first() }.takeIf { it.isNotEmpty() }
+                    ?.also {
+                        controller?.setMediaItemsWithTitle(
+                            it,
+                            title = requireContext().getString(R.string.category_songs),
+                            shuffleEnabled = true,
+                        )
+                        controller?.prepare()
+                        controller?.play()
+                    } ?: controller?.setMediaItems(listOf())
+            }
+
+            else -> throw IllegalStateException()
+        }
+        return true
     }
 
     fun maybeReportFullyDrawn(itemId: Int) {

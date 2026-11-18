@@ -61,6 +61,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import me.zhanghai.android.fastscroll.PopupTextProvider
 import org.akanework.gramophone.R
+import org.akanework.gramophone.custom.EmojiDisplay
 import org.akanework.gramophone.logic.getStringStrict
 import org.akanework.gramophone.logic.ui.DefaultItemHeightHelper
 import org.akanework.gramophone.logic.ui.ItemHeightHelper
@@ -358,8 +359,8 @@ abstract class BaseAdapter<T : Any>(
                 }
             }
         }
-        holder.title.text = titleOf(item) ?: virtualTitleOf(item)
-        holder.subTitle.text = subTitleOf(item)
+        holder.title.text = EmojiDisplay.display(context, titleOf(item) ?: virtualTitleOf(item))
+        holder.subTitle.text = EmojiDisplay.display(context, subTitleOf(item))
         holder.songCover.load(coverOf(item)) {
             placeholderScaleToFit(defaultCover)
             crossfade(true)

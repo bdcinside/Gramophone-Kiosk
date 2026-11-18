@@ -31,7 +31,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Mark package as self-built
-        run: printf 'releaseType=SelfBuilt\n' > package.properties
+        run: printf 'releaseType=SelfBuilt\nappIdOverride=org.akanework.gramophone.kiosk\n' > package.properties
 
       - name: Compile Android debug app
         run: |

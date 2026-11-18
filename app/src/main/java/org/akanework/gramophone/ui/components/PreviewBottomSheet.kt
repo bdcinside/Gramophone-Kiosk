@@ -38,6 +38,7 @@ import coil3.request.error
 import coil3.size.Scale
 import com.google.android.material.button.MaterialButton
 import org.akanework.gramophone.R
+import org.akanework.gramophone.custom.EmojiDisplay
 import org.akanework.gramophone.logic.playOrPause
 import org.akanework.gramophone.logic.startAnimation
 import org.akanework.gramophone.ui.MainActivity
@@ -122,9 +123,10 @@ class PreviewBottomSheet(
                 scale(Scale.FILL)
                 error(R.drawable.ic_default_cover)
             }
-            bottomSheetPreviewTitle.text = mediaItem?.mediaMetadata?.title
-            bottomSheetPreviewSubtitle.text =
-                mediaItem?.mediaMetadata?.artist ?: context.getString(R.string.unknown_artist)
+            bottomSheetPreviewTitle.text = EmojiDisplay.display(context, mediaItem?.mediaMetadata?.title)
+            bottomSheetPreviewSubtitle.text = EmojiDisplay.display(
+                context, mediaItem?.mediaMetadata?.artist ?: context.getString(R.string.unknown_artist)
+            )
         } else {
             bottomSheetPreviewCover.dispose()
         }

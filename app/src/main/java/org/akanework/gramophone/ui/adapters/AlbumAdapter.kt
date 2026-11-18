@@ -19,6 +19,8 @@ package org.akanework.gramophone.ui.adapters
 
 import android.net.Uri
 import androidx.appcompat.widget.PopupMenu
+import androidx.media3.common.Player
+import androidx.media3.common.MediaItem
 import androidx.core.view.iterator
 import androidx.fragment.app.Fragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -28,6 +30,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.akanework.gramophone.R
+import org.akanework.gramophone.custom.handleAlbumCoverTap
+import org.akanework.gramophone.logic.setMediaItemsWithTitle
 import org.akanework.gramophone.logic.getFile
 import org.akanework.gramophone.logic.requireMediaStoreId
 import org.akanework.gramophone.ui.MainActivity
@@ -66,10 +70,35 @@ class AlbumAdapter(
     }
 
     override fun onClick(item: Album, position: Int) {
-        mainActivity.startFragment(GeneralSubFragment()) {
-            putString("Id", item.id?.toString())
-            putInt("Item", R.id.album)
-        }
+        val controller = mainActivity.getPlayer()
+        handleAlbumCoverTap(
+            isPlaying = controller?.isPlaying == true,
+            startCompleteAlbumInTrackOrder = {
+                val orderedTracks = item.songList.sortedWith(
+                    compareBy<MediaItem>({ it.mediaMetadata.discNumber ?: 0 },
+                        { it.mediaMetadata.trackNumber ?: 0 })
+                )
+                if (orderedTracks.isNotEmpty()) {
+                    controller?.apply {
+                        setMediaItemsWithTitle(
+                            orderedTracks,
+                            position = 0,
+                            title = item.title ?: context.getString(R.string.unknown_album),
+                            shuffleEnabled = false,
+                            repeatMode = Player.REPEAT_MODE_OFF,
+                        )
+                        prepare()
+                        play()
+                    }
+                }
+            },
+            openAlbumDetails = {
+                mainActivity.startFragment(GeneralSubFragment()) {
+                    putString("Id", item.id?.toString())
+                    putInt("Item", R.id.album)
+                }
+            },
+        )
     }
 
     override fun onMenu(item: Album, popupMenu: PopupMenu) {

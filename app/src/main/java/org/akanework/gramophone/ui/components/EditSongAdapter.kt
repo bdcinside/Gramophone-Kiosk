@@ -40,6 +40,7 @@ import coil3.request.error
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.akanework.gramophone.R
+import org.akanework.gramophone.custom.EmojiDisplay
 import org.akanework.gramophone.logic.dpToPx
 import org.akanework.gramophone.logic.ui.MyRecyclerView
 import org.akanework.gramophone.logic.ui.placeholderScaleToFit
@@ -63,12 +64,12 @@ abstract class EditSongAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = getItem(position)
-        holder.songName.text = item.mediaMetadata.title
-        holder.songArtist.text = if (showDuration) context.getString(
+        holder.songName.text = EmojiDisplay.display(context, item.mediaMetadata.title)
+        holder.songArtist.text = EmojiDisplay.display(context, if (showDuration) context.getString(
             R.string.artist_time,
             item.mediaMetadata.durationMs?.convertDurationToTimeStamp(),
             item.mediaMetadata.artist ?: context.getString(R.string.unknown_artist)
-        ) else item.mediaMetadata.artist ?: context.getString(R.string.unknown_artist)
+        ) else item.mediaMetadata.artist ?: context.getString(R.string.unknown_artist))
         holder.songCover.load(item.mediaMetadata.artworkUri) {
             placeholderScaleToFit(getCoverFallback(position))
             crossfade(true)

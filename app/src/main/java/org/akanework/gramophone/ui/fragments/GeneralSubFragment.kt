@@ -35,6 +35,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.withContext
 import org.akanework.gramophone.R
+import org.akanework.gramophone.custom.EmojiDisplay
 import org.akanework.gramophone.logic.enableEdgeToEdgePaddingListener
 import org.akanework.gramophone.logic.ui.MyRecyclerView
 import org.akanework.gramophone.logic.utils.flows.PauseManagingSharedFlow.Companion.sharePauseableIn
@@ -166,7 +167,7 @@ class GeneralSubFragment : BaseFragment(true) {
             sharedTitle.collect {
                 withContext(Dispatchers.Main) {
                     // Show title text.
-                    collapsingToolbarLayout.title = it
+                    collapsingToolbarLayout.title = EmojiDisplay.display(requireContext(), it)
                 }
             }
         }

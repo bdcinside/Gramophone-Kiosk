@@ -56,7 +56,7 @@ open class BaseDecorAdapter<T : AdapterFragment.BaseInterface<*>>(
         parent: ViewGroup,
         viewType: Int,
     ): ViewHolder {
-        val view = adapter.layoutInflater.inflate(R.layout.general_decor, parent, false)
+        val view = adapter.layoutInflater.inflate(viewType, parent, false)
         return ViewHolder(view)
     }
 
@@ -332,7 +332,11 @@ open class BaseDecorAdapter<T : AdapterFragment.BaseInterface<*>>(
     protected open fun onExtraMenuButtonPressed(menuItem: MenuItem): Boolean = false
 
     override fun getItemCount(): Int = 1
-    override fun getItemViewType(position: Int): Int = R.layout.general_decor
+    override fun getItemViewType(position: Int): Int =
+        if (adapter is SongAdapter && adapter.isSubFragment == R.id.album)
+            R.layout.general_decor_album
+        else
+            R.layout.general_decor
 
     class ViewHolder(
         view: View,
@@ -351,6 +355,10 @@ open class BaseDecorAdapter<T : AdapterFragment.BaseInterface<*>>(
     }
 
     override fun getItemHeightFromZeroTo(to: Int): Int {
-        return if (to > 0) dpHeight else 0
+        return if (to > 0) {
+            if (adapter is SongAdapter && adapter.isSubFragment == R.id.album)
+                (156f * context.resources.displayMetrics.density + 0.5f).toInt()
+            else dpHeight
+        } else 0
     }
 }

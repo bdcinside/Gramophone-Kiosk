@@ -109,6 +109,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.akanework.gramophone.R
+import org.akanework.gramophone.custom.EmojiDisplay
 import org.akanework.gramophone.logic.GramophonePlaybackService
 import org.akanework.gramophone.logic.clone
 import org.akanework.gramophone.logic.dpToPx
@@ -1438,11 +1439,12 @@ class FullBottomSheet
                 addColorScheme()
             }
             bottomSheetFullTitle.setTextAnimation(
-                mediaItem?.mediaMetadata?.title ?: "",
+                EmojiDisplay.display(context, mediaItem?.mediaMetadata?.title),
                 skipAnimation = firstTime
             )
             bottomSheetFullSubtitle.setTextAnimation(
-                mediaItem?.mediaMetadata?.artist ?: context.getString(R.string.unknown_artist),
+                EmojiDisplay.display(context,
+                    mediaItem?.mediaMetadata?.artist ?: context.getString(R.string.unknown_artist)),
                 skipAnimation = firstTime
             )
             updateDuration()

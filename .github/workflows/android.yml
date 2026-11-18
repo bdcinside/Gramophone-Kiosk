@@ -25,6 +25,8 @@ on:
 
 jobs:
   build:
+    # Upstream release workflow needs secrets that are not configured in this fork.
+    if: github.repository == 'FoedusProgramme/Gramophone'
     name: Build App
     runs-on: ubuntu-latest
     steps:
