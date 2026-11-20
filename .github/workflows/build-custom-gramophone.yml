@@ -7,8 +7,8 @@ permissions:
   contents: read
 
 jobs:
-  android-debug:
-    name: Android debug APK
+  android-kiosk:
+    name: Android kiosk APK (without debug diagnostics)
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -35,14 +35,14 @@ jobs:
       - name: Mark package as self-built
         run: printf 'releaseType=SelfBuilt\nappIdOverride=org.akanework.gramophone.kiosk\n' > package.properties
 
-      - name: Compile Android debug app
+      - name: Compile Android kiosk app
         run: |
           chmod +x ./gradlew
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+          ./gradlew :app:assembleKiosk --no-daemon --stacktrace
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: Gramophone-Custom-Debug-APK
-          path: app/build/outputs/apk/**/*.apk
+          name: Gramophone-Kiosk-APK
+          path: app/build/outputs/apk/kiosk/*.apk
           if-no-files-found: error
