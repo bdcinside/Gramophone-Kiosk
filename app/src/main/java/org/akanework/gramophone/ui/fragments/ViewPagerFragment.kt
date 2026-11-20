@@ -113,7 +113,7 @@ class ViewPagerFragment : BaseFragment(true) {
                     isCheckable = true
                     isChecked = EmojiDisplay.isEnabled(requireContext())
                 }
-                menu.add(0, BluetoothVolumeSettings.ADMIN_MENU_ID, 1, "🔊 Bluetooth-Lautstärke …")
+                menu.add(0, BluetoothVolumeSettings.ADMIN_MENU_ID, 1, "🔊 Wiedergabelautstärke …")
                 setOnMenuItemClickListener { item ->
                     when (item.itemId) {
                         EmojiDisplay.ADMIN_MENU_ID -> {

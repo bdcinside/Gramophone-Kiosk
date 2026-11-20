@@ -34,6 +34,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.preference.PreferenceManager
 import org.akanework.gramophone.custom.BluetoothVolumeSettings
+import org.akanework.gramophone.custom.SystemVolumeSettings
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
@@ -106,7 +107,9 @@ class PostAmpAudioOutputProvider(
     private val btPreferences = PreferenceManager.getDefaultSharedPreferences(context.applicationContext)
     private val btPreferencesListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == BluetoothVolumeSettings.KEY_ENABLED ||
-            key == BluetoothVolumeSettings.KEY_MAX_PERCENT) {
+            key == BluetoothVolumeSettings.KEY_MAX_PERCENT ||
+            key == SystemVolumeSettings.KEY_BT_SYSTEM_ENABLED ||
+            key == SystemVolumeSettings.KEY_SPEAKER_ENABLED) {
             handler?.post {
                 calculateGain() // existing post-amplifier boost must also react to the guard
                 currentAudioOutput?.setVolumeInternal()

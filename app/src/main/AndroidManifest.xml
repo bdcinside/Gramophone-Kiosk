@@ -33,6 +33,8 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29"
         tools:ignore="ScopedStorage" />
+    <!-- Adjust media stream volume only while Gramophone's app-level limiter runs. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Run music playback service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"
 	    tools:ignore="ForegroundServicesPolicy" />

@@ -40,6 +40,7 @@ import android.provider.MediaStore
 import android.provider.Settings
 import android.view.Choreographer
 import android.view.SearchEvent
+import android.view.KeyEvent
 import android.view.ViewGroup
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -81,6 +82,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.akanework.gramophone.BuildConfig
+import org.akanework.gramophone.custom.SystemVolumeLimiter
 import org.akanework.gramophone.R
 import org.akanework.gramophone.logic.dpToPx
 import org.akanework.gramophone.logic.enableEdgeToEdgeProperly
@@ -114,6 +116,11 @@ import kotlin.time.Duration.Companion.milliseconds
  * @author AkaneTan, nift4
  */
 class MainActivity : BaseActivity() {
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (SystemVolumeLimiter.handleVolumeUp(this, event)) return true
+        return super.dispatchKeyEvent(event)
+    }
 
     companion object {
         private const val PERMISSION_READ_MEDIA_AUDIO = 100

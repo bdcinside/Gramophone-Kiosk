@@ -52,12 +52,18 @@ object BluetoothVolumeSettings {
     }
 
     /** Unknown route is conservatively capped until AudioTrack reports the destination. */
-    fun shouldLimit(context: Context, routedDeviceType: Int?): Boolean =
-        isEnabled(context) && (routedDeviceType == null || isBluetoothRoute(routedDeviceType))
+    fun shouldLimit(context: Context, routedDeviceType: Int?): Boolean {
+        val bluetooth = routedDeviceType == null || isBluetoothRoute(routedDeviceType)
+        val speaker = routedDeviceType == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER ||
+            routedDeviceType == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+        return (bluetooth && (isEnabled(context) || SystemVolumeSettings.btEnabled(context))) ||
+            (speaker && SystemVolumeSettings.speakerEnabled(context))
+    }
 
-    /** Absolute maximum app-level output multiplier (does not control headphone volume). */
+    /** Keep ReplayGain/boost from exceeding unity when a system ceiling is enabled. */
     fun capGain(context: Context, routedDeviceType: Int?): Float =
-        if (shouldLimit(context, routedDeviceType)) getLimitPercent(context) / 100f else 1f
+        if ((routedDeviceType == null || isBluetoothRoute(routedDeviceType)) && isEnabled(context))
+            getLimitPercent(context) / 100f else 1f
 
     fun limitGain(requested: Float, maxAllowed: Float): Float =
         requested.coerceIn(0f, maxAllowed.coerceIn(0f, 1f))

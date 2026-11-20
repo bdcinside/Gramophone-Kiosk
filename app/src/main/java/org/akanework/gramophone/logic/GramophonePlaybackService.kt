@@ -116,6 +116,7 @@ import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.guava.await
 import org.akanework.gramophone.R
 import org.akanework.gramophone.custom.BluetoothVolumeSettings
+import org.akanework.gramophone.custom.SystemVolumeLimiter
 import org.akanework.gramophone.logic.ui.MeiZuLyricsMediaNotificationProvider
 import org.akanework.gramophone.logic.ui.isManualNotificationUpdate
 import org.akanework.gramophone.logic.utils.AfFormatInfo
@@ -227,6 +228,7 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
     private lateinit var rgAp: ReplayGainAudioProcessor
     private var rgMode = 0 // 0 = disabled, 1 = track, 2 = album, 3 = smart
     private var bluetoothRouteActive = false
+    private lateinit var kioskSystemVolumeLimiter: SystemVolumeLimiter
     private var updatedLyricAtLeastOnce = false
     private val downstreamFormat = hashSetOf<Pair<Any, Pair<Int, Format>>>()
     private val pendingDownstreamFormat = hashSetOf<Pair<Any, Pair<Int, Format>>>()
@@ -321,6 +323,7 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
     override fun onCreate() {
         Log.i(TAG, "+onCreate()")
         super.onCreate()
+        kioskSystemVolumeLimiter = SystemVolumeLimiter(this)
         instanceForWidgetAndLyricsOnly = this
         internalPlaybackThread.start()
         playbackHandler = Handler(internalPlaybackThread.looper)
@@ -420,6 +423,7 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
                     { outputType ->
                         // AudioTrack routing events happen on its playback thread.
                         handler.post {
+                            kioskSystemVolumeLimiter.setActualRoute(outputType)
                             val bluetoothNow = BluetoothVolumeSettings.isBluetoothRoute(outputType)
                             if (bluetoothRouteActive != bluetoothNow) {
                                 bluetoothRouteActive = bluetoothNow
@@ -827,6 +831,7 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
     override fun onDestroy() {
         Log.i(TAG, "+onDestroy()")
         instanceForWidgetAndLyricsOnly = null
+        kioskSystemVolumeLimiter.close()
         unregisterReceiver(seekReceiver)
         unregisterReceiver(btReceiver)
         prefs.unregisterOnSharedPreferenceChangeListener(this)
