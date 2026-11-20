@@ -29,6 +29,12 @@ android {
     val releaseType = resolveProperties("releaseType")!!
     val appIdOverride = resolveProperties("appIdOverride")
     val vnos = resolveProperties("version" + "NameSuffixOverride")
+    // GitHub Actions provides a monotonically increasing run number for this workflow.
+    // Leave local builds unchanged; CI builds get a unique Android version code and name.
+    val kioskCiBuildNumber = providers.environmentVariable("GITHUB_RUN_NUMBER").orNull?.toIntOrNull()
+    require(kioskCiBuildNumber == null || kioskCiBuildNumber in 1..2_147_473_647) {
+        "GITHUB_RUN_NUMBER must be a positive integer"
+    }
 
     val myVersionName = "." + (vnos ?: "git rev-parse --short=7 HEAD".runCommand(workingDir = rootDir))
     if (releaseType.contains("\"")) {
@@ -104,17 +110,19 @@ android {
         applicationId = appIdOverride ?: "org.akanework.gramophone"
         minSdk = 23
         targetSdk = 37
-        versionCode = 24
+        // Automatic versioning for GitHub Actions; keep the current values for local builds.
+        versionCode = kioskCiBuildNumber?.let { 10_000 + it } ?: 24
         versionName = "1.1.2"
-        if (releaseType != "Release" || vnos != null) {
-            // by default the git commit hash is appended for non-release builds, however overrides
-            // will apply unconditionally
+        if (kioskCiBuildNumber != null) {
+            versionNameSuffix = "-kiosk.$kioskCiBuildNumber"
+        } else if (releaseType != "Release" || vnos != null) {
+            // Preserve the original project behavior outside GitHub Actions.
             versionNameSuffix = vnos ?: myVersionName
         }
         buildConfigField(
             "String",
             "MY_VERSION_NAME",
-            "\"$versionName$myVersionName\""
+            "\"${versionName}${versionNameSuffix ?: ""}\""
         )
         buildConfigField(
             "String",
