@@ -2,7 +2,6 @@
 package org.akanework.gramophone.custom
 
 import android.content.Context
-import java.util.Locale
 
 /** Converts only visible library labels; original metadata and search/sort keys stay unchanged. */
 object EmojiDisplay {
@@ -25,12 +24,8 @@ object EmojiDisplay {
         return if (isEnabled(context)) convertText(original) else original
     }
 
-    /** Word boundaries prevent converting substrings e.g. "Maus" inside "Mausoleum". */
-    fun convertText(original: String): String = WORD_PATTERN.replace(original) { match ->
-        WORD_TO_EMOJI[match.value.lowercase(Locale.GERMAN)] ?: match.value
-    }
-
-    private val WORD_PATTERN = Regex("""\p{L}+""")
+    /** Whole words, inflections and safely recognized German compounds; no filename mutation. */
+    fun convertText(original: String): String = EmojiLexicon.convertText(original, WORD_TO_EMOJI)
 
     // Exact whole-word matches only. No untrusted or externally supplied mappings.
     private val WORD_TO_EMOJI: Map<String, String> = mapOf(
