@@ -219,6 +219,15 @@ android {
             isPseudoLocalesEnabled = true
             applicationIdSuffix = ".debug"
         }
+        // Release-like build for a child-friendly kiosk: no debugging diagnostics.
+        // Temporary CI signing: use a stable private signing key for future upgrades.
+        create("kiosk") {
+            isDebuggable = false
+            isMinifyEnabled = false
+            isShrinkResources = false
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+        }
         forEach {
             it.vcsInfo {
                 include = false
