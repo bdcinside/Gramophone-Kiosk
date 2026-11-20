@@ -30,16 +30,22 @@ internal object EmojiLexicon {
             putAll(parseRows(ADJECTIVES).apply { generateAdjectiveForms() })
             putAll(parseRows(VERBS).apply { generateVerbForms() })
             putAll(parseRows(IRREGULAR))
+            for ((word, emoji) in parseRows(SONG_VERB_FORMS)) putIfAbsent(word, emoji)
         }
     }
 
     // Only nouns and the legacy dictionary should be combined inside compounds.
     private val compoundWords: Map<String, String> by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-        parseRows(NOUNS).apply { generateNounForms() }
+        parseRows(NOUNS).apply {
+            // Curated song-specific meanings override general supplemental aliases.
+            // The original EmojiDisplay dictionary still has highest priority.
+            putAll(parseRows(SONG_NOUNS))
+            generateNounForms()
+        }
     }
 
     private val phraseRules: List<Pair<Regex, String>> by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-        PHRASES.lineSequence().mapNotNull { raw ->
+        (SONG_PHRASES + "\n" + PHRASES).lineSequence().mapNotNull { raw ->
             val trimmed = raw.trim()
             if (trimmed.isEmpty() || '|' !in trimmed) return@mapNotNull null
             val (emoji, phrase) = trimmed.split('|', limit = 2)
@@ -177,6 +183,253 @@ internal object EmojiLexicon {
         if (parts.emojis.size < 2 || parts.emojis.size > MAX_COMPOUND_PARTS) return null
         return parts.emojis.joinToString(" ")
     }
+
+    // Curated against 770 exported filenames from the user's children's music library.
+    // Whole song titles are NOT replaced; distinctive words, figures and expressions are.
+    // Do not insert incomplete filename fragments or generic artist names here.
+    private val SONG_NOUNS = """
+🦒🐒🎵|giraffenaffensong
+🦒🐒|giraffenaffe giraffenaffen
+🎵|song songs liedermacher spielerlied
+📖🎵|lernlied
+📐🎵|formenlied
+🇬🇧🎵|englischlied
+🎨🎵|farbenlied
+📅🎵|wochentagelied
+💃🎵|tanzlied
+🌦️🎵|wetterlied
+🎼🎵|tonleiterlied
+❓🎵|rätsellied
+🕰️📅|jahresuhr
+📅|jahreszeiten jahr zeit jahreskinder monat monate wochentag wochentage woche wochen kalender september oktober november dezember januar februar märz april mai juni juli august sommermonat wintermonat
+🍂|herbstwind herbstfeuer herbstleuchten herbstzeit herbstblatt herbststurm oktoberwind herbstlaub
+🌬️|windmelodie windstoß windstoss sturmwind windstille blasewind
+🌈|regenbogens regenbogenland
+🌳✨|traumzauberbaum
+🎉✨|traumzauberfest
+🌌✨|traumzauberwelt traumzauber
+🐛|traumläuse traumlaus laus läuse
+🏮|laterne laternen latern laternenumzug laternenlied laternenkinder leuchtlaterne laternenlicht
+🐌|schneckenpost schneckenbrief
+💌|post postbote postbotin brief briefe briefkasten
+🎊|fasching fastnacht fastnachtsparty karneval karnevalszeit helau
+🎪|zirkus zirkuslied zirkuszelt
+🎢|karussell karussells
+🐦|vöglein vogelkind vogelkindchen frühlingsvogel frühlingvogel
+🐑|lämmlein lämmchen schäfchen schäfchenschar mäh mähh maeh
+🐔|hühnerstall hühnerhof puthenne huhnchen hühnerhoflied
+🐶|mops möpschen dackel dackelwackeltanz
+🫏|esel eselchen eseln esels eselslied
+🌾⚙️|mühle mühlen getreidemühle wassermühle
+👨‍🌾|müller müllers
+🧙|kobold kobolde
+🐮|kutscher pferdekutscher
+🐦|kuckuck kuckucksruf
+🐸|fröschelein froschlein froschrock
+🐛|raupe raupen raupenkind raupenschmetterling
+🐞|marienwürmchen marienkäferlied
+🐝|bienchenlied bienenlied
+🪱|regenwürmer regenwurm
+🦇|fledermauslied fledermäuschen
+🐼|bummi
+🧝|pumuckl pitti platsch pitti-platsch
+🐝|maja majas
+💃🌙|ballnacht
+🐦|star staren
+🐦|storch störche
+🧮|mathematik rechenkunst
+🕺|hampelmann hampelmänner
+🛡️|wickie wikinger wikingerschiff
+🐊|schnappi
+🧸|rumpelpumpel klopsemops teddybaerlein
+🌹|dornröschen dornroeschen
+👧|rotkäppchen rotkaeppchen schneewittchen
+🔤|buchstabenland buchstabenpaar buchstabenpärchen anlaut abc buchstabe buchstaben
+🔢|zahlenland zahlenkanon zahlenteufel zähllied zahlenspiel zahlenlied rechenlied einmaleins einspluseins
+🧮|rechnen rechenaufgabe
+📐|geometrie dreieck viereck quadrat formen
+➖|linie
+🔵|punkt
+⭕|kreis kreise
+🍮|wackelpudding
+🍙|reiskugel
+🥞😱|pfannkuchenschreck
+🍪|kokoskeks kekslied weihnachtsbäckerei
+🍝|bolognese
+🍬|gummibär gummibären
+🍍|apfelsinchen
+🍎|apfelbaum apfelbäumchen
+🍓|himbeere himbeeren himbeer himbeerchen
+🌰|eichel eicheln
+🌿|kleegras kleewiese
+🌼|löwenzahn löwenmaul akelei
+🌺|klatschmohn
+🌲|weihnachtslärche lärche lärchen tanne tannen
+🦕|saurierkind dinosaurierriese
+🦣|steinzeit steinzeitlied
+☃️|schneemannslied
+❄️|schneeballschlacht winterruhe
+🌫️|nebel zwergennebel nebelwiese
+🌊|seefahrt seefahrer seeräuber küste wellen woge wogen wellengang
+🛶|kahn paddelboot schaukelschiff
+⛵|segler schiffsreise
+🏝️|inselmeer meerinsel
+🏖️|strandbuddelei sandburg sommerstrand
+🚲|drahtesel
+🏍️|motorradfahrt motorradfahren
+🚜|mähmaschine maehemaschine
+🚒|tatütata tatutata tata
+🎺|horn hornbläser
+🥁|tamborim maracas rassel maraccarassel
+🪘|didgeridoo
+🎹|glockenspiel daumenklavier
+🎼|kontrabass kontrabässe contrabass
+🔔|klingklang kling klingeling bimmelt ticktack ticktacklied
+⏰|uhr uhren zeiger minutenzeiger stundenzeiger jahresuhrlied
+🎵|musikanten musikante spielmann spielmannslied
+🎤|rap
+🎶|duett gesang gesangsstück
+🎉|partytime feuerwerk fest feier geburtstagslied geburtstagsfest
+🎁|geschenk geschenket
+💋|küsschenlied liebkoselied kusslied
+👑|prinzessinnen königreich thron prinzentochter
+🧙|hexenturm hexentanz hexenschwur
+👻|gespensterduett geisterduett schreckgespenst
+🧚|zauberland wunderland zauberwasser zauberrezeptur feenland
+🧹|besenschwur
+🪄|zauberspruch
+🛌|sandmännchen schlaflied schlafenszeit wiegenlied
+🌒|mondsilbertaufe mondnacht
+🪐|planetenlied himmelsrichtungen
+🌟|sternenhimmel sternenstunde sternschnuppen
+🌩️|gewitter gewitternacht
+🪄|zauberer zauberei
+🎈|luftballons luftballonlied
+🎂|geburtstagskind geburtstagslieder
+🏫|kindergarten kindergartenkinder kindergartenkinderlied kinderhaus schulhaus schulausflug
+🧒|kindermutmachlied kinderwelt kinderchor vorschulchor
+👶|babyzeit kindlein
+👩|mutti muttertag frauentag puppenmutti
+👵|omama großmama grossmama
+👴|opapa großpapa grosspapa
+🤝|freundschaft freundschaftslied
+💪|mut mutmachlied stärken
+🤗|umarmung umarmen
+💡|idee plan einfall
+🔎|rätsel ratefrage rätselnummer
+🎒|rucksack schulranzen koffer
+🚦|fußgängerampel fussgaengerampel
+🚶|wanderung wanderer wandern wanderschaft wanderlust spaziergang
+🛝|kinderspiel spielplatz
+🕺|zeigertanz kreistanz ringelreia schwungtanz
+🐴|reiter ritt ponylied
+🐑|schafschlaflied
+🤗|kuschelsong
+🦊|fredi ferdi
+🦔|ida igel
+🤠|cowboy cowboys cowgirl indianer
+🏴‍☠️|pirat seeräuber seeraeuber
+⚔️|ritter rittersmann
+👹|dracula monstermann
+🏡|bauernhof bauernhoflied farm hühnerhof
+🐫|karawane kamelkarawane kamelkarawanen karawanen
+🏔️|hügel hügeln berglied
+🚀|weltraumreise
+
+🪵|holzrührlein
+🗣️|gespräch
+🎼|zwischenspiel
+📢|ansage
+📖|einleitung
+💬|worte wort rede sprechen
+🕊️|friedenstaube frieden
+🧑‍🔧|handwerker handwerkerlied
+🌍|kontinente kontinent deutschland europa welt
+🍃|frühtau frühtautropfen
+🥳|hurra
+🎃|halloweenparty
+🐔|hühnerstall
+🚘|wagen rad
+🏬|supermarkt möbelhaus selbstbedienungsladen basar markt marktplatz
+🌞|sommerhitze hochsommer
+🌧️|sommerregen novemberwetter regenlied regentropfen regentröpfchen
+🐦|schwalbe schwalben
+🚽|popel
+🩹|kratzefuss
+😨|höhenangst finsternis
+😴|müdigkeit müden schlaftrunkenheit
+🤪|quatsch quatschlied
+😂|spaß spass späßchen spasslied
+💪|kraft anstrengung
+🐉|drachenkind
+🥥|kokosnuss kokosnuß kokosnüsse kokosnusskeks
+
+🍀|glück glückwunsch
+☀️🎵|sonnenlied
+🌞|sonnenschau sonnentanz
+🔠|buchstabenlied buchstabenlandlied
+🎤|liedermacher
+""".trimIndent()
+
+    // Additional verb forms and short interjections occurring in the exported titles.
+    private val SONG_VERB_FORMS = """
+🚶|komm kommt kommst
+👋|willkommen
+💃|tanz tanzt tanze tanzte getanzt drehen dreht dreh
+🎶|sing singe singst singend pfeifen pfeift pfeif gesungen summ summt summen tönen tönt
+🚶|geh gehet ging ginge gegangen gehen kommt ankommen angekommen
+✈️|flieg fliege fliegt fliegen geflogen
+🚗|fährt fährst gefahren fuhr
+🛌|schlief schliefen schlaf schlaft
+🌅|erwacht erwachen aufwachen aufgewacht
+🌱|geblüht blüht verblüht
+🌧️|tröpfelt tropft nieselt
+🏗️|bauen baut gebauet gebaut
+🎉|feiern feiert gefeiert
+👀|schau schaut gesehen
+👂|horch horcht horchen
+🪜|steigt steigen klettern
+🍰|backe backen backt gebacken
+🚶|spaziert wandert marschiert
+🔔|klappert rasselt bimmelt klingelt
+😴|wiegt einschläfern
+🤲|halten hält hielt
+🏃|rast rasen gerast
+""".trimIndent()
+
+    // Specific recurring character names and known bilingual song names. Boundaries are handled by phraseRules.
+    private val SONG_PHRASES = """
+🐝|biene maja
+🐝🎂|majas geburtstag
+🐉 🥥|drache kokosnuss
+🐉 🥥|drache kokosnuß
+👧 🧦|pippi langstrumpf
+👦 👧|hänsel und gretel
+🔔|frère jacques
+🔔|bruder jakob
+👨‍🌾|old mc donald
+👨‍🌾|old mcdonald
+🪳|la cucaracha
+❄️|let it go
+💤|la le lu
+🎤|do re mi
+🎶|aramsamsam
+🌈|am ende des regenbogens
+👋|hallo hello
+🐸🎸|frosch rock
+🐌📮|schneckenpost
+🧝|pitti platsch
+🧝|pitti-platsch
+🏮|laterne laterne
+🏮|ich geh mit meiner laterne
+👩‍🌾|im märzen der bauer
+🐣|das kleine küken piept
+🐰|häschen in der grube
+🐴|hoppe hoppe reiter
+🥞😱|der pfannkuchenschreck
+💃|es tanzt ein bi-ba-butzemann
+🎂|zum geburtstag viel glück
+""".trimIndent()
 
     // Format: emoji|singular plural synonyms variants. New vocabulary can be extended by adding rows.
     private val NOUNS = """
