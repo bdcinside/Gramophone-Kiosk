@@ -20,6 +20,7 @@ package org.akanework.gramophone.logic.utils
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioDeviceInfo
@@ -31,6 +32,8 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
+import androidx.preference.PreferenceManager
+import org.akanework.gramophone.custom.BluetoothVolumeSettings
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
@@ -53,7 +56,8 @@ import kotlin.math.min
 // TODO: less hacky https://github.com/nift4/media/commit/22d2156bec74542a0764bf0ec27c839cc70874ed
 // TODO: less hacky https://github.com/nift4/media/commit/2988651676987cfd42affc21e1939d6cacbfbe7f
 class PostAmpAudioOutputProvider(
-    val sink: ExtendedAudioOutputProvider, val rgAp: ReplayGainAudioProcessor, val context: Context
+    val sink: ExtendedAudioOutputProvider, val rgAp: ReplayGainAudioProcessor,
+    val context: Context, private val routedDeviceListener: (Int?) -> Unit
 ) : ForwardingAudioOutputProvider(sink), AudioSystemHiddenApi.VolumeChangeListener {
     companion object {
         private const val TAG = "PostAmpAOP"
@@ -99,6 +103,17 @@ class PostAmpAudioOutputProvider(
         }
     }
     private val audioManager = context.getSystemService<AudioManager>()!!
+    private val btPreferences = PreferenceManager.getDefaultSharedPreferences(context.applicationContext)
+    private val btPreferencesListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == BluetoothVolumeSettings.KEY_ENABLED ||
+            key == BluetoothVolumeSettings.KEY_MAX_PERCENT) {
+            handler?.post {
+                calculateGain() // existing post-amplifier boost must also react to the guard
+                currentAudioOutput?.setVolumeInternal()
+                updateVolumeEffect()
+            }
+        }
+    }
     private var handler: Handler? = null
     private val isDpeOffloadable by lazy {
         try {
@@ -130,6 +145,7 @@ class PostAmpAudioOutputProvider(
     private var rgVolume = 1f
 
     init {
+        btPreferences.registerOnSharedPreferenceChangeListener(btPreferencesListener)
         var forVolumeChanged = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
         if (!forVolumeChanged) {
             try {
@@ -248,6 +264,9 @@ class PostAmpAudioOutputProvider(
                         "(${routedDevice?.type?.let { audioDeviceTypeToString(context, it) }})"
             )
             deviceType = routedDevice?.type
+            // Change the cap as soon as the active AudioTrack route changes.
+            setVolumeInternal()
+            routedDeviceListener(deviceType)
             if (dpeEffect != null) {
                 calculateGain() // device change may have changed available headroom, recalculate boost
             } else {
@@ -290,8 +309,11 @@ class PostAmpAudioOutputProvider(
         }
 
         fun setVolumeInternal() {
-            super.setVolume(volume * rgVolume)
-            updateVolumeEffect() // setVolume() will reset volume effect state, so configure it again
+            // Keep an independent app-level ceiling on the real routed Bluetooth output.
+            // Android hardware volume and headphone-local amplification remain separate.
+            val maxGain = BluetoothVolumeSettings.capGain(context, deviceType)
+            super.setVolume(BluetoothVolumeSettings.limitGain(volume * rgVolume, maxGain))
+            updateVolumeEffect() // setVolume() can reset effects; restore their state
         }
 
         override fun canReuseAudioOutput(
@@ -471,7 +493,8 @@ class PostAmpAudioOutputProvider(
             mode = rgAp.mode
             rgGain = rgAp.rgGain
             nonRgGain = rgAp.nonRgGain
-            boostGainDb = rgAp.boostGain
+            boostGainDb = if (BluetoothVolumeSettings.shouldLimit(context, deviceType)) 0
+                else rgAp.boostGain
             reduceGain = rgAp.reduceGain
         }
         dpeEffect?.created = isDpeAvailable && isDpeOffloadable && offloadEnabled!!
@@ -561,7 +584,8 @@ class PostAmpAudioOutputProvider(
         synchronized(rgAp) {
             boostGainDb = rgAp.boostGain
         }
-        volumeEffect!!.created = boostGainDb > 0
+        volumeEffect!!.created = boostGainDb > 0 &&
+                !BluetoothVolumeSettings.shouldLimit(context, deviceType)
         if (!volumeEffect!!.hasControl /* implied: || boostGainDb <= 0 */) return
         try {
             val curVolumeDb = getCurrentMixerVolume()
@@ -585,6 +609,7 @@ class PostAmpAudioOutputProvider(
     }
 
     override fun release() {
+        btPreferences.unregisterOnSharedPreferenceChangeListener(btPreferencesListener)
         synchronized(rgAp) {
             rgAp.settingsChangedListener = null
             rgAp.boostGainChangedListener = null

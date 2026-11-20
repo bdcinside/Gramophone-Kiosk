@@ -115,6 +115,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.guava.await
 import org.akanework.gramophone.R
+import org.akanework.gramophone.custom.BluetoothVolumeSettings
 import org.akanework.gramophone.logic.ui.MeiZuLyricsMediaNotificationProvider
 import org.akanework.gramophone.logic.ui.isManualNotificationUpdate
 import org.akanework.gramophone.logic.utils.AfFormatInfo
@@ -225,6 +226,7 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
     private lateinit var afFormatTracker: AfFormatTracker
     private lateinit var rgAp: ReplayGainAudioProcessor
     private var rgMode = 0 // 0 = disabled, 1 = track, 2 = album, 3 = smart
+    private var bluetoothRouteActive = false
     private var updatedLyricAtLeastOnce = false
     private val downstreamFormat = hashSetOf<Pair<Any, Pair<Int, Format>>>()
     private val pendingDownstreamFormat = hashSetOf<Pair<Any, Pair<Int, Format>>>()
@@ -414,7 +416,17 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
                 this,
                 GramophoneRenderFactory(
                     this, rgAp, this::onAudioSinkInputFormatChanged,
-                    afFormatTracker::setAudioSink
+                    afFormatTracker::setAudioSink,
+                    { outputType ->
+                        // AudioTrack routing events happen on its playback thread.
+                        handler.post {
+                            val bluetoothNow = BluetoothVolumeSettings.isBluetoothRoute(outputType)
+                            if (bluetoothRouteActive != bluetoothNow) {
+                                bluetoothRouteActive = bluetoothNow
+                                computeRgMode(true)
+                            }
+                        }
+                    }
                 )
                     .setEnableHighResolutionPcmOutput(true)
                     .setEnableDecoderFallback(true)
@@ -914,8 +926,9 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
             scheduleSendingLyrics(false)
             endedWorkaroundPlayer?.updateLyricNow()
         }
-        if (key == null || key == "rg_mode") {
-            rgMode = prefs.getStringStrict("rg_mode", "0")!!.toInt()
+        if (key == null || key == "rg_mode" || key == BluetoothVolumeSettings.KEY_NORMALIZE_ALBUMS) {
+            if (key == null || key == "rg_mode")
+                rgMode = prefs.getStringStrict("rg_mode", "0")!!.toInt()
             restart = !computeRgMode(true)
         }
         if (key == null || key == "rg_drc") {
@@ -941,8 +954,12 @@ class GramophonePlaybackService : MediaLibraryService(), MediaSessionService.Lis
     }
 
     private fun computeRgMode(force: Boolean): Boolean {
+        // Use the existing ReplayGain processor for metadata-based album normalization.
+        // If tags are missing, the processor leaves loudness unchanged.
+        val effectiveMode = if (bluetoothRouteActive &&
+            BluetoothVolumeSettings.normalizeAlbums(this)) 2 else rgMode
         return rgAp.setMode(
-            when (rgMode) {
+            when (effectiveMode) {
                 0 -> ReplayGainUtil.Mode.None
                 1 -> ReplayGainUtil.Mode.Track
                 2 -> ReplayGainUtil.Mode.Album

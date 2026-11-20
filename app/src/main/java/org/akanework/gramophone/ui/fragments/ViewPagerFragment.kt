@@ -54,6 +54,8 @@ import kotlinx.coroutines.runBlocking
 import org.akanework.gramophone.R
 import org.akanework.gramophone.custom.HiddenAdminGate
 import org.akanework.gramophone.custom.EmojiDisplay
+import org.akanework.gramophone.custom.BluetoothVolumeSettings
+import org.akanework.gramophone.custom.BluetoothVolumeDialog
 import org.akanework.gramophone.logic.clone
 import org.akanework.gramophone.logic.enableEdgeToEdgePaddingListener
 import org.akanework.gramophone.logic.needsManualSnackBarInset
@@ -111,13 +113,21 @@ class ViewPagerFragment : BaseFragment(true) {
                     isCheckable = true
                     isChecked = EmojiDisplay.isEnabled(requireContext())
                 }
+                menu.add(0, BluetoothVolumeSettings.ADMIN_MENU_ID, 1, "🔊 Bluetooth-Lautstärke …")
                 setOnMenuItemClickListener { item ->
-                    if (item.itemId == EmojiDisplay.ADMIN_MENU_ID) {
-                        EmojiDisplay.setEnabled(requireContext(), !EmojiDisplay.isEnabled(requireContext()))
-                        // Recreate refreshes album lists, headings and both player UIs.
-                        requireActivity().recreate()
-                        true
-                    } else handleHomeMenuItemClick(item)
+                    when (item.itemId) {
+                        EmojiDisplay.ADMIN_MENU_ID -> {
+                            EmojiDisplay.setEnabled(requireContext(), !EmojiDisplay.isEnabled(requireContext()))
+                            // Recreate refreshes album lists, headings and both player UIs.
+                            requireActivity().recreate()
+                            true
+                        }
+                        BluetoothVolumeSettings.ADMIN_MENU_ID -> {
+                            BluetoothVolumeDialog.show(requireContext())
+                            true
+                        }
+                        else -> handleHomeMenuItemClick(item)
+                    }
                 }
                 show()
             }

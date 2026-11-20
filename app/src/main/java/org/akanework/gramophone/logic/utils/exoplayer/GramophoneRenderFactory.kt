@@ -42,7 +42,8 @@ class GramophoneRenderFactory(
     context: Context,
     private val rgAp: ReplayGainAudioProcessor,
     private val configurationListener: (Format?) -> Unit,
-    private val audioSinkListener: (PostAmpAudioOutputProvider) -> Unit
+    private val audioSinkListener: (PostAmpAudioOutputProvider) -> Unit,
+    private val routedDeviceListener: (Int?) -> Unit = {}
 ) :
     DefaultRenderersFactory(context) {
     override fun buildTextRenderers(
@@ -111,7 +112,7 @@ class GramophoneRenderFactory(
         val builder = DefaultAudioSink.Builder(context)
         val aop = PostAmpAudioOutputProvider(
             ExtendedAudioOutputProvider(AudioTrackAudioOutputProvider.Builder(context)
-                .setMaxPlaybackSpeed(4f).build()), rgAp, context)
+                .setMaxPlaybackSpeed(4f).build()), rgAp, context, routedDeviceListener)
         builder.setAudioOutputProvider(aop)
         builder.setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
         builder.setEnableHighResolutionPcmOutput(pcmEncodingRestrictionLifted)
